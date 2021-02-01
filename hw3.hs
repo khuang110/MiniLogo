@@ -42,15 +42,15 @@ expr1 = Add (PushI 2) (Mul (PushI 3) (PushV "x"))
 
 -- | 2 + 3 * x + 4
 expr2 :: Expr
-expr2 = undefined
+expr2 = Add (Add (PushI 2) (Mul (PushI 3) (PushV "x"))) (PushI 4)
 
 -- | (x + 2) * 3 * y
 expr3 :: Expr
-expr3 = undefined
+expr3 = Mul (Mul (Add (PushV "x") (PushI 2)) (PushI 3)) (PushV "y")
 
 -- | (x + 2) * (y + 3)
 expr4 :: Expr
-expr4 = undefined
+expr4 = Mul (Add (PushV "x") (PushI 2)) (Add (PushV "y") (PushI 3))
 
 
 -- ** Pretty printer
