@@ -70,7 +70,12 @@ expr4 = Mul (Add (PushV "x") (PushI 2)) (Add (PushV "y") (PushI 3))
 --   "(x + 2) * (y + 3)"
 --
 prettyExpr :: Expr -> String
-prettyExpr = undefined
+prettyExpr (PushI i) = show i
+prettyExpr (PushV v) = v
+prettyExpr (Add x y) = prettyExpr x ++ " + " ++ prettyExpr y
+prettyExpr (Mul x y) = prettyExpr x ++ " * " ++ prettyExpr y
+
+
 
 
 --
