@@ -27,10 +27,11 @@ type Var = String
 
 -- | Expressions.
 data Expr
-    = PushI Int
-    | PushV Var 
+    = Lit Int
+    | Ref Var 
     | Add Expr Expr
     | Mul Expr Expr
+    | Group Expr
   deriving (Eq,Show)
 
 
@@ -38,19 +39,19 @@ data Expr
 
 -- | 2 + 3 * x
 expr1 :: Expr
-expr1 = Add (PushI 2) (Mul (PushI 3) (PushV "x"))
+expr1 = Add (Lit 2) (Mul (Lit 3) (Ref "x"))
 
 -- | 2 + 3 * x + 4
 expr2 :: Expr
-expr2 = Add (Add (PushI 2) (Mul (PushI 3) (PushV "x"))) (PushI 4)
+expr2 = Add (Add (Lit 2) (Mul (Lit 3) (Ref "x"))) (Lit 4)
 
 -- | (x + 2) * 3 * y
 expr3 :: Expr
-expr3 = Mul (Mul (Add (PushV "x") (PushI 2)) (PushI 3)) (PushV "y")
+expr3 = Mul (Mul (Group (Add (Ref "x") (Lit 2))) (Lit 3)) (Ref "y")
 
 -- | (x + 2) * (y + 3)
 expr4 :: Expr
-expr4 = Mul (Add (PushV "x") (PushI 2)) (Add (PushV "y") (PushI 3))
+expr4 = Mul (Group (Add (Ref "x") (Lit 2))) (Group (Add (Ref "y") (Lit 3)))
 
 
 -- ** Pretty printer
@@ -70,10 +71,11 @@ expr4 = Mul (Add (PushV "x") (PushI 2)) (Add (PushV "y") (PushI 3))
 --   "(x + 2) * (y + 3)"
 --
 prettyExpr :: Expr -> String
-prettyExpr (PushI i) = show i
-prettyExpr (PushV v) = v
-prettyExpr (Add x y) = prettyExpr x ++ " + " ++ prettyExpr y
+prettyExpr (Lit i) = show i
+prettyExpr (Ref v) = v
+prettyExpr (Add x y) = "(" ++ prettyExpr x ++ " + " ++ prettyExpr y ++ ")"
 prettyExpr (Mul x y) = prettyExpr x ++ " * " ++ prettyExpr y
+--prettyExpr (Group x) = "(" ++ prettyExpr x ++ ")"
 
 
 
@@ -90,6 +92,7 @@ type Macro = String
 -- | The arguments to be evaluated and passed to a macro.
 type Args = [Expr]
 
+--data Cmds = Cmd | Cmds deriving (Show)
 -- | A sequence of commands.
 type Block = [Cmd]
 
@@ -97,10 +100,22 @@ type Block = [Cmd]
 data Mode = Down | Up
   deriving (Eq,Show)
 
+
+-- data Test
+--     = Set Var Expr
+--     | Block [Cmd]
+--     deriving (Eq, Show)
+
+
+
 -- | Commands.
 data Cmd
-   = CmdTODO  -- This is a dummy constructor that should be removed!
+   = Pen Mode
+   | Move(Expr, Expr)
+   | Macro [Args]
+   | For Expr Block    -- for var=expr to expr block
   deriving (Eq,Show)
+
 
 
 -- ** Examples
@@ -119,7 +134,16 @@ data Cmd
 --   }
 --
 boxBody :: Block
-boxBody = undefined
+boxBody = [Pen Up, 
+            Move(Ref "x", Ref "y"),
+            Pen Down,
+            Move(Add (Ref "x") (Ref "w"), Ref "y"),
+            Move(Add (Ref "x") (Ref "w"), Add (Ref "y") (Ref "h")),
+            Move(Add (Ref "x") (Ref "w"), Add (Ref "y") (Ref "h")),
+            Move(Ref "x", Add(Ref "y") (Ref "h")),
+            Move(Ref "x", Ref "y")
+            ]
+
 
 
 -- | The body of the main macro.
