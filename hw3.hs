@@ -31,8 +31,13 @@ data Expr
     | Ref Var 
     | Add Expr Expr
     | Mul Expr Expr
-    | Group Expr
   deriving (Eq,Show)
+
+
+prettyExpr2 :: Eq a => a -> Expr
+prettyExpr2 (Mul x y) e
+            | Just m <- prettyExpr2 (Add x y) e = Just Add
+            | Just m <- prettyExpr2 (Mul x y) e = Just Mul
 
 
 -- ** Examples
@@ -42,16 +47,17 @@ expr1 :: Expr
 expr1 = Add (Lit 2) (Mul (Lit 3) (Ref "x"))
 
 -- | 2 + 3 * x + 4
+
 expr2 :: Expr
 expr2 = Add (Add (Lit 2) (Mul (Lit 3) (Ref "x"))) (Lit 4)
 
 -- | (x + 2) * 3 * y
 expr3 :: Expr
-expr3 = Mul (Mul (Group (Add (Ref "x") (Lit 2))) (Lit 3)) (Ref "y")
+expr3 = Mul (Mul (Add (Ref "x") (Lit 2)) (Lit 3)) (Ref "y")
 
 -- | (x + 2) * (y + 3)
 expr4 :: Expr
-expr4 = Mul (Group (Add (Ref "x") (Lit 2))) (Group (Add (Ref "y") (Lit 3)))
+expr4 = Mul (Add (Ref "x") (Lit 2)) (Add (Ref "y") (Lit 3))
 
 
 -- ** Pretty printer
@@ -73,9 +79,9 @@ expr4 = Mul (Group (Add (Ref "x") (Lit 2))) (Group (Add (Ref "y") (Lit 3)))
 prettyExpr :: Expr -> String
 prettyExpr (Lit i) = show i
 prettyExpr (Ref v) = v
-prettyExpr (Add x y) = "(" ++ prettyExpr x ++ " + " ++ prettyExpr y ++ ")"
-prettyExpr (Mul x y) = prettyExpr x ++ " * " ++ prettyExpr y
---prettyExpr (Group x) = "(" ++ prettyExpr x ++ ")"
+prettyExpr (Add x y) = prettyExpr x ++ " + " ++ prettyExpr y
+prettyExpr (Mul x y) = case 
+  prettyExpr x ++ " * " ++ prettyExpr y
 
 
 
@@ -92,7 +98,6 @@ type Macro = String
 -- | The arguments to be evaluated and passed to a macro.
 type Args = [Expr]
 
---data Cmds = Cmd | Cmds deriving (Show)
 -- | A sequence of commands.
 type Block = [Cmd]
 
@@ -100,22 +105,13 @@ type Block = [Cmd]
 data Mode = Down | Up
   deriving (Eq,Show)
 
-
--- data Test
---     = Set Var Expr
---     | Block [Cmd]
---     deriving (Eq, Show)
-
-
-
 -- | Commands.
 data Cmd
-   = Pen Mode
-   | Move(Expr, Expr)
-   | Macro [Args]
-   | For Expr Block    -- for var=expr to expr block
+  = Pen Mode
+  | Move Expr Expr
+  | Call Macro Args
+  | For Macro Expr Expr Block
   deriving (Eq,Show)
-
 
 
 -- ** Examples
@@ -134,16 +130,15 @@ data Cmd
 --   }
 --
 boxBody :: Block
-boxBody = [Pen Up, 
-            Move(Ref "x", Ref "y"),
-            Pen Down,
-            Move(Add (Ref "x") (Ref "w"), Ref "y"),
-            Move(Add (Ref "x") (Ref "w"), Add (Ref "y") (Ref "h")),
-            Move(Add (Ref "x") (Ref "w"), Add (Ref "y") (Ref "h")),
-            Move(Ref "x", Add(Ref "y") (Ref "h")),
-            Move(Ref "x", Ref "y")
-            ]
-
+boxBody = [
+  Pen Up,
+  Move (Ref "x") (Ref "y"),
+  Pen Down,
+  Move (Add (Ref "x") (Ref "w")) (Ref "y"),
+  Move (Add (Ref "x") (Ref "w")) (Add (Ref "y") (Ref "h")),
+  Move (Ref "x") (Add (Ref "y") (Ref "h")),
+  Move (Ref "x") (Ref "y")
+  ]
 
 
 -- | The body of the main macro.
@@ -155,7 +150,16 @@ boxBody = [Pen Up,
 --     }
 --   }
 mainBody :: Block
-mainBody = undefined
+mainBody = [
+  For "i" (Lit 1) (Lit 15) [
+    Call ("box") [
+      (Ref "i"),
+      (Ref "i"),
+      (Ref "i"),
+      (Ref "i")
+      ]
+    ]
+  ]
 
 
 -- ** Pretty printer
@@ -202,8 +206,26 @@ prettyMode Up   = "up"
 --   "for i = 1 to 10 {}"
 --
 prettyCmd :: Cmd -> String
-prettyCmd = undefined
-
+prettyCmd (Pen x)       =  "pen "
+                        ++ prettyMode x
+prettyCmd (Move x y)    =  "move("
+                        ++ prettyExpr x
+                        ++ ", "
+                        ++ prettyExpr y
+                        ++ ")"
+prettyCmd (For i x y z) =  "for "
+                        ++ i ++ " = "
+                        ++ prettyExpr x
+                        ++ " to "
+                        ++ prettyExpr y
+                        ++ " "
+                        ++ prettyBlock z
+prettyCmd (Call x ys)   =  x
+                        ++ "("
+                        ++ prettyArgs ys
+                        ++ ")"
+  where
+    prettyArgs = intercalate ", " . map prettyExpr
 
 -- | Pretty print a block of commands.
 --
@@ -261,7 +283,27 @@ data Prog = Program [Def] Block
 --   }
 --
 boxes :: Prog
-boxes = undefined
+boxes = Program [
+    Define "box" ["x", "y", "w", "h"] [
+    Pen Up,
+    Move (Ref "x") (Ref "y"),
+    Pen Down,
+    Move (Add (Ref "x") (Ref "w")) (Ref "y"),
+    Move (Add (Ref "x") (Ref "w")) (Add (Ref "y") (Ref "h")),
+    Move (Ref "x") (Add (Ref "y") (Ref "h")),
+    Move (Ref "x") (Ref "y")
+    ]
+  ]
+  [
+  For "i" (Lit 1) (Lit 15) [
+    Call ("box") [
+      (Ref "i"),
+      (Ref "i"),
+      (Ref "i"),
+      (Ref "i")
+      ]
+    ]
+  ]
 
 
 -- | Pretty print a macro definition.
